@@ -104,6 +104,66 @@ function processDefault(req, res, urlParts ) {
 	res.end();
 }
 
+
+//=============================================================================
+//Service definition: Query Service
+//Description:
+//	Query activity data inside the circle boundary of <lon,lat> , radius = distance.
+//
+//URL:
+//	ROOT/query?lat=&lon=&distance=&p1=&p2=&device_id=&app_key=&ip_address
+//Parameters:
+//
+//  <lat,lon>
+//	distance: in meter.
+//  p1:  1=Vehicles.  2=Passengers
+//  p2:
+//	device_id :
+//	ip_address:
+//	app_key:
+//
+//Response:
+//	{ 'error' : error,
+//    'data' : data     //contains array of event data.
+//	};
+//=============================================================================
+function processQueryRequest(req, res, urlParts ) {
+    var	queryString = urlParts.query;
+	var getParams = {
+					'app_key': queryString.app_key,
+					'device_id': queryString.device_id,
+					'ip_address': req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+					
+					'lat': queryString.lat,
+					'lon': queryString.lon,
+					'distance': queryString.distance,
+					'p1': queryString.p1,
+					'p2': queryString.p2,
+				};
+		
+	console.log('processQueryRequest');
+	
+	console.log(JSON.stringify(getParams));
+	
+	fetchCollection( getParams, 'activities',res);
+}
+
+function processActionPost(req, res, urlParts ) {
+    var	queryString = urlParts.query;
+	var getParams = {
+			'lat': queryString.lat,
+			'lon': queryString.lon
+			};
+				
+	console.log('processActionPost');
+	console.log(JSON.stringify(getParams));
+	
+	sendReply(res, 0, {});	
+	
+}
+
+
+
 http.Server(function(req, res) {
 	var urlParts = url.parse(req.url, true);
 	var	queryString = urlParts.query;
@@ -141,14 +201,20 @@ http.Server(function(req, res) {
 
 	
 	switch(urlParts.pathname) {
+	case '/query':
+		processQueryRequest(req,res, urlParts);
+		break;
+		
+	case '/action':
+		processActionPost(req,res, urlParts);
+		break;
+		
 	case '/nearby':
 		processNearby(req,res, urlParts);
 		break;
 	case '/users/create':
 	    processUserCreation(req,res, urlParts);
 	    break;
-	case '/act':
-	
 	case '/login':
 	case '/logout':
 	default:
