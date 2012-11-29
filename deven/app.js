@@ -27,17 +27,19 @@ var countlyConfig = require('./config')
     //, easy_routes = require('./easy_routes')
     , easy_utils_hash = require('./easy_utils/easy_hash.js')
     , easy_utils_http = require('./easy_utils/easy_http.js')
+    , easy_utils_gps = require('./easy_utils/easy_gps_calc.js')
+    , easy_mongo_activities = require('./easy_mongo/easy_mongo_activities_crud.js')
 ;
 
 /**
  * Config dependencies. **************************************************
  */
 
-var hostIp = countlyConfig.mongodb.host
+var hostHttpIp = countlyConfig.api.host
     , hostHttpPort = countlyConfig.api.port
+    , hostDbIp = countlyConfig.mongodb.host
     , hostDbPort = countlyConfig.mongodb.port
-    , countlyDb = mongo.db(hostIp + ':' + hostDbPort + '/'
-        + countlyConfig.mongodb.db + '?auto_reconnect')
+    , countlyDb = mongo.db(hostDbIp + ':' + hostDbPort + '/' + countlyConfig.mongodb.db + '?auto_reconnect')
 ;
 
 
@@ -94,16 +96,38 @@ app.get('/query', function(req, res, next) {
 });
 
 
-//app.post('/action', function(req, res, next) {
-app.get('/action', function(req, res, next) {
-    console.log("/action");
+app.post('/action', function(req, res, next) {
+//app.get('/action', function(req, res, next) {
+
+    console.log("Request PATH: /action");
 
     if(!req.body)  {
-        easy_utils_http.sendReply(res, -1, {desc:'Invalid request.'});
+        easy_utils_http.sendReply(res, -1, {desc:'Invalid request!'});
         return;
     }
 
-    console.log(JSON.stringify(req.body));
+    var requestBody = JSON.stringify(req.body);
+
+    //console.log('Request STATUS: ' + req.statusCode);
+    console.log('Request HEADERS: ' + JSON.stringify(req.headers));
+    //console.log('Request BODY: ' + JSON.stringify(req.body));
+    console.log('Request BODY: ' + requestBody);
+
+    if(!easy_utils_gps.validateLocation(requestBody))
+    {
+        easy_utils_http.sendReply(res, -1, {desc:'Invalid request!'});
+        return;
+    }
+
+    var location = req.body.location;
+    var distance = req.body.distance;
+    var locationString = JSON.stringify(location);
+    var distanceString = JSON.stringify(distance);
+
+    console.log('location: ' + location);
+    console.log('locationString: ' + locationString);
+    console.log('distance: ' + distance);
+    console.log('distanceString: ' + distanceString);
 
     /*
 
@@ -122,23 +146,49 @@ app.get('/action', function(req, res, next) {
     });
     */
 
-    var locPoint = [120,30];
-    var maxDistance = 5;
+    //var locPoint = [120,30];
+    //var maxDistanceByKM = 6378 * 5;
 
+    //var locPoint = locationString;    //ERROR
+    //var maxDistanceByKM = 6378 * distanceString;   //ERROR
+
+    var locPoint = location;
+    var maxDistanceByKM = distance;
+
+    easy_mongo_activities.find_by_distance(countlyDb, locPoint, maxDistanceByKM, function(err, array){
+
+        if(err) {
+            easy_utils_http.sendReply(res, -2, {});
+            return false;
+        }
+
+        if(array) {
+
+            console.log(JSON.stringify(array));
+            easy_utils_http.sendReply(res, 0, array);
+            return true;
+
+            console.log("[easy_mongo_activities.find_by_distance] Found Nothing!");
+            easy_utils_http.sendReply(res, -1, array);
+            return false;
+        }
+    });
+
+    /*
     //countlyDb.collection('activities').findItems( { location : { $near : [120,30] , $maxDistance : 5 } }, function(err, array) {
     countlyDb.collection('activities').findItems(
         { location : { $near : locPoint , $maxDistance : maxDistance } },
         function(err, array) {
 
-        /*
+        / *
          if(err) {
          easy_utils_http.sendReply(res, -2, {});
          return false;
          }
-         */
+         * /
 
         if(array) {
-            /*
+            / *
              var result = new Array();
              array.forEach(function(item){
              db.dereference(item.dbref_role,function(err,doc){
@@ -148,7 +198,7 @@ app.get('/action', function(req, res, next) {
              }
              });
              });
-             */
+             * /
             console.log(JSON.stringify(array));
             easy_utils_http.sendReply(res, 0, array);
             return;
@@ -157,6 +207,8 @@ app.get('/action', function(req, res, next) {
         console.log("[activities_find_by_distance] Nothing found!");
         easy_utils_http.sendReply(res, -1, array);
     } );
+    */
+
 });
 
 /**
